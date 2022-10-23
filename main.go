@@ -3,6 +3,7 @@ package main
 import (
 	"io"
 	"os"
+	"os/signal"
 	"fmt"
 	//"path/filepath"
 	//"hash"
@@ -23,6 +24,23 @@ type Arguments struct {
 	InputFiles []string `arg:"positional,required" help:"Input file; accepts glob."`
 }
 
+func handleInterrupt(spinner *yacspin.Spinner) {
+	fd := int(os.Stdout.Fd())
+	if !term.IsTerminal(fd) {
+		return
+	}
+
+	ch := make(chan os.Signal, 5)
+	signal.Notify(ch, os.Interrupt)
+	<-ch
+
+	if spinner != nil {
+		spinner.Stop()
+	}
+	fmt.Print("\x1b[?25h\n")
+	os.Exit(1)
+}
+
 func main() {
 	args := &Arguments{}
 	arg.MustParse(args)
@@ -40,9 +58,10 @@ func run(args *Arguments) error {
 
 	isTerm := term.IsTerminal(int(os.Stdout.Fd()))
 	var err error
+	var spinner *yacspin.Spinner
+	go handleInterrupt(spinner)
 
 	for _, f := range args.InputFiles {
-		var spinner *yacspin.Spinner
 		if isTerm {
 			cfg := yacspin.Config{
 				Frequency: time.Millisecond * 500,
