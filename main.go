@@ -5,7 +5,7 @@ import (
 	"os"
 	"os/signal"
 	"fmt"
-	//"path/filepath"
+	"path/filepath"
 	//"hash"
 	"hash/crc32"
 	"time"
@@ -22,6 +22,8 @@ var re_hash_strict = regexp.MustCompile(`(\{|\[|\()([a-fA-F0-9]{8})(\}|\]|\))`)
 
 type Arguments struct {
 	InputFiles []string `arg:"positional,required" help:"Input file; accepts glob."`
+	AddHash bool `arg:"-a,--add" help:"Add the calculated hash to the filename if none is found."`
+	AddDelim string `arg:"-d,--add-delim" help:"Character to use before the added hash."`
 }
 
 func handleInterrupt(spinner *yacspin.Spinner) {
@@ -44,6 +46,11 @@ func handleInterrupt(spinner *yacspin.Spinner) {
 func main() {
 	args := &Arguments{}
 	arg.MustParse(args)
+
+	if args.AddDelim != "" {
+		args.AddHash = true
+	}
+
 	err := run(args)
 	if err != nil {
 		fmt.Println(err)
@@ -83,23 +90,36 @@ func run(args *Arguments) error {
 			return fmt.Errorf("error calculating crc for %q: %w", f, err)
 		}
 
+		crc_filename := re_hash_strict.FindString(f)
+		if crc_filename != "" {
+			crc_filename = crc_filename[1:9]
+		} else {
+			crc_filename = re_hash.FindString(f)
+		}
+
+		color := "33"
+		if crc_filename != "" {
+			if crc_filename == crc {
+				// found and is correct
+				color = "32"
+			} else {
+				// found and is incorrect
+				color = "31"
+			}
+		} else if args.AddHash {
+			// not found
+
+			ext := filepath.Ext(f)
+			newName := f[:len(f)-len(ext)]+args.AddDelim+"["+crc+"]"+ext
+			err = os.Rename(f, newName)
+			if err != nil {
+				return fmt.Errorf("unable to rename file: %w", err)
+			}
+		}
+
 		if isTerm {
 			spinner.Stop()
 
-			crc_filename := re_hash_strict.FindString(f)
-			if crc_filename != "" {
-				crc_filename = crc_filename[1:9]
-			} else {
-				crc_filename = re_hash.FindString(f)
-			}
-			color := "33"
-			if crc_filename != "" {
-				if crc_filename == crc {
-					color = "32"
-				} else {
-					color = "31"
-				}
-			}
 			f = strings.Replace(f, crc_filename, "\x1b["+color+"m"+crc_filename+"\x1b[0m", 1)
 			fmt.Printf("\x1b[%sm%s\x1b[0m %s\n", color, crc, f)
 
