@@ -11,6 +11,7 @@ import (
 	"regexp"
 	"strings"
 
+	"golang.org/x/term"
 	"github.com/alexflint/go-arg"
 	"github.com/theckman/yacspin"
 )
@@ -37,45 +38,55 @@ func run(args *Arguments) error {
 		return fmt.Errorf("no input file(s) given")
 	}
 
+	isTerm := term.IsTerminal(int(os.Stdout.Fd()))
+	var err error
+
 	for _, f := range args.InputFiles {
-		cfg := yacspin.Config{
-			Frequency: time.Millisecond * 500,
-			CharSet: yacspin.CharSets[51],
-			Suffix: "   ",
-			Message: f,
-			StopCharacter: "",
-			StopColors: []string{"fgGreen"},
+		var spinner *yacspin.Spinner
+		if isTerm {
+			cfg := yacspin.Config{
+				Frequency: time.Millisecond * 500,
+				CharSet: yacspin.CharSets[51],
+				Suffix: "   ",
+				Message: f,
+				StopCharacter: "",
+				StopColors: []string{"fgGreen"},
+			}
+			spinner, err = yacspin.New(cfg)
+			if err != nil {
+				return fmt.Errorf("unable to start spinner: %w", err)
+			}
+			spinner.Start()
 		}
-		spinner, err := yacspin.New(cfg)
-		if err != nil {
-			return fmt.Errorf("unable to start spinner: %w", err)
-		}
-		spinner.Start()
 
 		crc, err := crcFilename(f)
 		if err != nil {
 			return fmt.Errorf("error calculating crc for %q: %w", f, err)
 		}
 
-		spinner.Stop()
+		if isTerm {
+			spinner.Stop()
 
-		crc_filename := re_hash_strict.FindString(f)
-		if crc_filename != "" {
-			crc_filename = crc_filename[1:9]
-		} else {
-			crc_filename = re_hash.FindString(f)
-		}
-		color := "33"
-		if crc_filename != "" {
-			if crc_filename == crc {
-				color = "32"
+			crc_filename := re_hash_strict.FindString(f)
+			if crc_filename != "" {
+				crc_filename = crc_filename[1:9]
 			} else {
-				color = "31"
+				crc_filename = re_hash.FindString(f)
 			}
-		}
-		f = strings.Replace(f, crc_filename, "\x1b["+color+"m"+crc_filename+"\x1b[0m", 1)
-		fmt.Printf("\x1b[%sm%s\x1b[0m %s\n", color, crc, f)
+			color := "33"
+			if crc_filename != "" {
+				if crc_filename == crc {
+					color = "32"
+				} else {
+					color = "31"
+				}
+			}
+			f = strings.Replace(f, crc_filename, "\x1b["+color+"m"+crc_filename+"\x1b[0m", 1)
+			fmt.Printf("\x1b[%sm%s\x1b[0m %s\n", color, crc, f)
 
+		} else {
+			fmt.Printf("%s %s\n", crc, f)
+		}
 	}
 
 	return nil
