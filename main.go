@@ -11,10 +11,13 @@ import (
 	"time"
 	"regexp"
 	"strings"
+	//"net/url"
+	"html"
 
 	"golang.org/x/term"
 	"github.com/alexflint/go-arg"
 	"github.com/theckman/yacspin"
+	"github.com/zorchenhimer/go-ed2k"
 )
 
 var re_hash = regexp.MustCompile(`([a-fA-F0-9]{8})`)
@@ -24,6 +27,7 @@ type Arguments struct {
 	InputFiles []string `arg:"positional,required" help:"Input file; accepts glob."`
 	AddHash bool `arg:"-a,--add" help:"Add the calculated hash to the filename if none is found."`
 	AddDelim string `arg:"-d,--add-delim" help:"Character to use before the added hash."`
+	Ed2k bool `arg:"-e,--ed2k" help:"Print ED2K links."`
 }
 
 func handleInterrupt(spinner *yacspin.Spinner) {
@@ -85,6 +89,20 @@ func run(args *Arguments) error {
 			spinner.Start()
 		}
 
+		if args.Ed2k {
+			crc, err := ed2kFilename(f)
+			if err != nil {
+				return fmt.Errorf("error calculating ed2k for %q: %w", f, err)
+			}
+
+			if isTerm {
+				spinner.Stop()
+			}
+
+			fmt.Println(crc)
+			continue
+		}
+
 		crc, err := crcFilename(f)
 		if err != nil {
 			return fmt.Errorf("error calculating crc for %q: %w", f, err)
@@ -137,6 +155,7 @@ func crcFilename(filename string) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	defer file.Close()
 
 	hsh := crc32.New(crc32.IEEETable)
 	_, err = io.Copy(hsh, file)
@@ -147,3 +166,30 @@ func crcFilename(filename string) (string, error) {
 	return fmt.Sprintf("%08X", hsh.Sum32()), nil
 }
 
+// Returns a full ed2k link.  These links are dumb AF.
+func ed2kFilename(filename string) (string, error) {
+	file, err := os.Open(filename)
+	if err != nil {
+		return "", err
+	}
+	defer file.Close()
+
+	hsh := ed2k.New()
+	_, err = io.Copy(hsh, file)
+	if err != nil {
+		return "", fmt.Errorf("error calculating hash: %w", err)
+	}
+
+	hash, err := hsh.SumBlue()
+	if err != nil {
+		return "", err
+	}
+
+	st, err := os.Stat(filename)
+	if err != nil {
+		return "", err
+	}
+
+	// ed2k://|file|FILENAME|SIZE|HASH|/
+	return fmt.Sprintf("ed2k://|file|%s|%d|%s|/", html.EscapeString(strings.ReplaceAll(filename, " ", "_")), st.Size(), hash), nil
+}
