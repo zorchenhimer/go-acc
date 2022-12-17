@@ -24,10 +24,27 @@ var re_hash = regexp.MustCompile(`([a-fA-F0-9]{8})`)
 var re_hash_strict = regexp.MustCompile(`(\{|\[|\()([a-fA-F0-9]{8})(\}|\]|\))`)
 
 type Arguments struct {
-	InputFiles []string `arg:"positional,required" help:"Input file; accepts glob."`
-	AddHash bool `arg:"-a,--add" help:"Add the calculated hash to the filename if none is found."`
-	AddDelim string `arg:"-d,--add-delim" help:"Character to use before the added hash."`
-	Ed2k bool `arg:"-e,--ed2k" help:"Print ED2K links."`
+	InputFiles []string `arg:"positional,required" help:"Input files"`
+	AddHash bool `arg:"-a,--add" help:"Add the calculated hash to the filename if none is found"`
+	AddDelim string `arg:"-d,--add-delim" help:"Character to use before the added hash"`
+	Ed2k bool `arg:"-e,--ed2k" help:"Print ED2K links"`
+}
+
+func (a Arguments) Description() string {
+	return `
+Compute CRC32 and ED2K hashes for files.
+
+Default behavior is to simply compute and verify CRC32 hashes found in
+filenames.  If no hash is found, one can be added with the --add option.
+
+The --add-delim option sets the character to use to separate the original
+filename from the added CRC32 hash.  This defaults to an empty string (ie, no
+delimiter).  The added hash is always surrounded by square brackets.
+
+Generating full ED2K links is done with the --ed2k option.  If this option is
+passed, the files will not be CRC32 hashed.  ED2K hashes cannot
+be added to filenames.
+`
 }
 
 func handleInterrupt(spinner *yacspin.Spinner) {
@@ -167,6 +184,8 @@ func crcFilename(filename string) (string, error) {
 }
 
 // Returns a full ed2k link.  These links are dumb AF.
+// Link format is: ed2k://|file|FILENAME|SIZE|HASH|/ where the filename is HTML
+// escaped, not URL escaped.
 func ed2kFilename(filename string) (string, error) {
 	file, err := os.Open(filename)
 	if err != nil {
@@ -190,6 +209,5 @@ func ed2kFilename(filename string) (string, error) {
 		return "", err
 	}
 
-	// ed2k://|file|FILENAME|SIZE|HASH|/
 	return fmt.Sprintf("ed2k://|file|%s|%d|%s|/", html.EscapeString(strings.ReplaceAll(filename, " ", "_")), st.Size(), hash), nil
 }
