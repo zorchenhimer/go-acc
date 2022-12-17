@@ -13,7 +13,9 @@ Generating full ED2K links is done with the `--ed2k option`.  If this option is
 passed, the files will not be CRC32 hashed.  ED2K hashes cannot
 be added to filenames.
 
-    Usage: main [--add] [--add-delim ADD-DELIM] [--ed2k] INPUTFILES [INPUTFILES ...]
+## Usage
+
+    acc [--add] [--add-delim ADD-DELIM] [--ed2k] INPUTFILES [INPUTFILES ...]
 
     Positional arguments:
       INPUTFILES             Input files
