@@ -134,7 +134,7 @@ func run(args *Arguments) error {
 
 		color := "33"
 		if crc_filename != "" {
-			if crc_filename == crc {
+			if strings.ToUpper(crc_filename) == crc {
 				// found and is correct
 				color = "32"
 			} else {
