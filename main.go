@@ -209,5 +209,5 @@ func ed2kFilename(filename string) (string, error) {
 		return "", err
 	}
 
-	return fmt.Sprintf("ed2k://|file|%s|%d|%s|/", html.EscapeString(strings.ReplaceAll(filename, " ", "_")), st.Size(), hash), nil
+	return fmt.Sprintf("ed2k://|file|%s|%d|%s|/", html.EscapeString(strings.ReplaceAll(filepath.Base(filename), " ", "_")), st.Size(), hash), nil
 }
