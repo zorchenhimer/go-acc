@@ -47,6 +47,8 @@ be added to filenames.
 `
 }
 
+var spinner *yacspin.Spinner
+
 func handleInterrupt(spinner *yacspin.Spinner) {
 	fd := int(os.Stdout.Fd())
 	if !term.IsTerminal(fd) {
@@ -73,6 +75,10 @@ func main() {
 	}
 
 	err := run(args)
+	if spinner != nil {
+		spinner.Stop()
+	}
+
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(1)
@@ -85,11 +91,21 @@ func run(args *Arguments) error {
 	}
 
 	isTerm := term.IsTerminal(int(os.Stdout.Fd()))
-	var err error
-	var spinner *yacspin.Spinner
+	//var err error
 	go handleInterrupt(spinner)
 
 	for _, f := range args.InputFiles {
+		st, err := os.Stat(f)
+		if err != nil {
+			fmt.Printf("Unable to stat %s: %s\n", f, err.Error())
+			continue
+		}
+
+		if st.IsDir() {
+			fmt.Println("Skipping directory", f)
+			continue
+		}
+
 		if isTerm {
 			cfg := yacspin.Config{
 				Frequency: time.Millisecond * 500,
@@ -109,7 +125,15 @@ func run(args *Arguments) error {
 		if args.Ed2k {
 			crc, err := ed2kFilename(f)
 			if err != nil {
-				return fmt.Errorf("error calculating ed2k for %q: %w", f, err)
+				if isTerm {
+					spinner.Stop()
+				}
+				fmt.Printf("error calculating ed2k for %q: %w\n", f, err)
+				continue
+			}
+
+			if isTerm {
+				spinner.Stop()
 			}
 
 			if isTerm {
@@ -122,7 +146,11 @@ func run(args *Arguments) error {
 
 		crc, err := crcFilename(f)
 		if err != nil {
-			return fmt.Errorf("error calculating crc for %q: %w", f, err)
+			if isTerm {
+				spinner.Stop()
+			}
+			fmt.Printf("error calculating crc for %q: %w\n", f, err)
+			continue
 		}
 
 		crc_filename := re_hash_strict.FindString(f)
