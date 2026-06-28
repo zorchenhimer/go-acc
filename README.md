@@ -9,7 +9,7 @@ The `--add-delim` option sets the character to use to separate the original
 filename from the added CRC32 hash.  This defaults to an empty string (ie, no
 delimiter).  The added hash is always surrounded by square brackets.
 
-Generating full ED2K links is done with the `--ed2k option`.  If this option is
+Generating full ED2K links is done with the `--ed2k` option.  If this option is
 passed, the files will not be CRC32 hashed.  ED2K hashes cannot
 be added to filenames.
 
